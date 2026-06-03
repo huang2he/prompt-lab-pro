@@ -1,0 +1,1 @@
+../../../prompt-lab-skill-repo/prompt-lab/references/smoke-probe.md
