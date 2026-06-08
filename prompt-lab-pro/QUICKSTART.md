@@ -123,10 +123,18 @@ skill 自动建 workspace 目录、写 `config.json`，不需要你操作。看�
 
 ### Phase C · Criteria 签字 ★ 用户 gate
 
-skill 会抽 5 个评分维度（如「响应相关性 / 节奏主控 / 字段完整性」等）给你看。
+skill **基于你 Q1 的 prompt 动态抽出**评分维度（不是套用现成模板）：
 
-- 看一眼维度合理就回 `OK` 或 `签字通过`
-- 想加/改维度就直接说，如 `加一条"不脏话不冒犯"`
+- Suggester 读你的 prompt → 抽 `business_goals[]` + `behavior_rules[]`
+- 每条规则带 `prompt_source` 指明源自 prompt 的哪一段
+- 显示给你看 → 你 **gate**：「通过 / 改第 N 条 / 重抽」
+- 第二次 gate：可手动加自然语言规则（如「30 秒内必须自报家门」），Claude 帮转结构化
+
+**所以同事跑不同业务（电商 / 银行 / 教育）时，抽出来的 criteria 完全不同。**
+
+跨轮规则：round-01 签字后 round-02+ 默认复用；prompt 结构大改时 skill 主动问要不要重抽。
+
+> ⚠️ `references/criteria-templates/voice-outbound-zh-auto-sales.json` 是个**汽车外呼场景的预制模板**，仅用于「多个 prompt 在同标尺下横向对比」的场景，不会默认套用。新业务不用管它。
 
 ### Phase D · Smoke probe（约 1 分钟）
 
