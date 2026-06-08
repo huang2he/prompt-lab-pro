@@ -3,7 +3,7 @@ name: prompt-lab-pro
 description: Dispatcher-native upgrade of prompt-lab. Same 6-phase eval-improve-eval SOP and v3 rubric (5 dimensions incl. conversation_flow), but two surgical upgrades — (1) Phase E.2 评分走 dispatcher /evaluation_batch（本地拼 evaluator.prompt + dispatcher 服务端并发执行 + self-consistency + multi-evaluator ensemble），不再用 inline Claude 或 6-subagent dispatch；(2) Phase E ASR 噪声直接映射到 dispatcher 原生字段 user.silence_rate/silence_message/asr_failure_rate/asr_failure_message，dispatcher 按概率确定性插入扰动，不再嵌 persona 描述让 user-LLM 假装演噪声。Use when iterating a chat / voice / outbound-call prompt and you want fast (~2.6× vs prompt-lab) + reliable (no Claude rate limit) + reproducible (dispatcher-driven ASR noise) scoring, ESPECIALLY for ≥30 transcripts per round. Trigger phrases include "用 prompt-lab-pro", "上 pro 版", "走 evaluation_batch", "dispatcher 评分", "ensemble judge", "self-consistency 评分". Do NOT use for one-shot prompt edits, real-call audio analysis, or when dispatcher is unreachable (fallback to prompt-lab v3.4 inline mode).
 ---
 
-> **关系说明**：本 skill 继承 `prompt-lab` v3.4 的 6 阶段 SOP（A→F）+ rubric v3（5 维度含 conversation_flow）+ 三档分类 + capability map + Case A-D Round-to-Round 决策树。**所有 references 大部分 symlink 共享**，只 fork 这 3 个：`intake.md` / `scoring-pipeline.md` / `api-call-params.md`。
+> **关系说明**：本 skill 设计上承接 `prompt-lab` v3.4 的 6 阶段 SOP（A→F）+ rubric v3（5 维度含 conversation_flow）+ 三档分类 + capability map。**v1.1 起已完全独立**，所有 references / scripts 都 inline 到本 repo，不再依赖 `~/.claude/skills/prompt-lab/` 目录的存在。
 >
 > **核心差异 vs prompt-lab v3.4**：
 > 1. **Phase E.2 评分链路重写** — 不再有 inline / subagent 二选一，强制走 dispatcher `/evaluation_batch`。**本地 Claude 主会话只负责拼 evaluator.prompt（思考工作）**，dispatcher 负责 fan-out 执行（执行工作）。
@@ -108,7 +108,7 @@ Phase F  收尾 · 能力地图（同 prompt-lab）
 
 继承 prompt-lab v3.4 全部 hard rules，**新增 pro 版独有**：
 
-- **Dispatcher 寻址**（同 prompt-lab）：baked-in URL `http://47.100.137.178:8080`（共享 `~/.claude/skills/prompt-lab/.env` 的 token）。改 URL 设 env var `PROMPT_LAB_DISPATCHER_URL`。
+- **Dispatcher 寻址**：baked-in URL `http://47.100.137.178:8080`，token 落 `~/.claude/skills/prompt-lab-pro/.env`（若不存在则 fallback 到 `~/.claude/skills/prompt-lab/.env` 兼容老用户）。改 URL 设 env var `PROMPT_LAB_DISPATCHER_URL`。
 - **Judge 强制远端**：pro 版 Q3-D 不接受 `local: true`。要本地评分用上游 prompt-lab。
 - **ASR 噪声必须走 dispatcher 字段**：persona.asr_noise level → `scripts/run_round.py:asr_noise_block()` → `user.silence_rate / silence_message / asr_failure_rate / asr_failure_message`。**不再**在 persona.prompt 末尾 append 噪声块。
 - **E.2a 拼 evaluator.prompt 是 gate**：必须主会话 Claude 读 rubric/criteria/failure-types/prompt 后拼好，写到 `<round>/evaluator_prompt.md`，**用户预览确认**才能跑 E.2b。
@@ -126,7 +126,7 @@ Phase F  收尾 · 能力地图（同 prompt-lab）
 
 同 prompt-lab v3.4。Host 用 baked-in URL（`47.100.137.178`）。详细脚本模板见 `references/intake.md` A.-1 章节。
 
-**A.0 dispatcher 自动解析**：跑 `python3 ~/.claude/skills/prompt-lab/scripts/load_dispatcher.py --json`（pro 版 symlink 共享）：
+**A.0 dispatcher 自动解析**：跑 `python3 ~/.claude/skills/prompt-lab-pro/scripts/load_dispatcher.py --json`：
 - `missing: []` → 跳 Q0-B 直接 healthz
 - `missing: ["token"]` → 问 Q0-B 一次，`--save-token` 写盘后续自动复用
 
@@ -139,7 +139,7 @@ Phase F  收尾 · 能力地图（同 prompt-lab）
 
 简要清单（**注意 pro 版独有改动**）：
 - **Q0-A 已撤**（v3.4 起）
-- **Q0-B dispatcher access_token**（仅首次问，共享 `~/.claude/skills/prompt-lab/.env`）
+- **Q0-B dispatcher access_token**（仅首次问，落 `~/.claude/skills/prompt-lab-pro/.env`）
 - **Q1 基准 prompt** （同 prompt-lab）
 - **Q2 测试集来源 + ASR 噪声 (★ pro 改)**：3 选 1 来源 + ASR 噪声 level；**pro 版自动把 level 映射到 dispatcher 原生扰动字段**，不嵌 persona 描述
 - **Q3 5 个角色模型配置**：

@@ -1,0 +1,112 @@
+{
+  "$schema_version": "v2",
+  "name": "voice-outbound-zh-auto-sales",
+  "version": "33-criteria-v2-categorized",
+  "description": "中文汽车外呼场景业务通用 criteria 模板。33 条指标按 6 大类组织。用于 N 个 prompt 横向对比的公共评分标尺（取代'从单 prompt 抽 criteria'，确保跨 prompt 可比）。",
+  "applicable_scenarios": [
+    "汽车外呼信息收集（6 字段：购车意向/品牌车型/购车城市/购车时间/客户姓氏/手机尾号四位）",
+    "TTS 语音 outbound 场景",
+    "类似的中文销售/调研 outbound 任务（参考改写部分指令）"
+  ],
+
+  "categories": {
+    "流程完整性": {
+      "code": "process_integrity",
+      "weight": 0.20,
+      "desc": "agent 能否完整跑完业务流程并保持节奏",
+      "criteria": [
+        {"id": "I1", "name": "六字段完整采集", "method": "llm_judge", "desc": "意向/品牌车型/城市/时间/姓氏/尾号四位全部采到。漏 1 项 fail。合理早退（已购车/二手车/辱骂/范围外/在开车）→ n/a。"},
+        {"id": "I2", "name": "推进顺序合规", "method": "llm_judge", "desc": "按 意向→品牌车型→城市→时间→姓→尾号→收尾 顺序。乱序 fail。没采全 n/a。"},
+        {"id": "I4", "name": "信息确认次数控制", "method": "llm_judge", "desc": "整通 agent 复述 ≥2 字段汇总成'您关注X、X城市、X时间对吧'≥2 次 → fail。最多 1 次轻量确认。"},
+        {"id": "I5", "name": "节奏主控", "method": "llm_judge", "desc": "客户答完一项后 agent 立即衔接下个未采字段，不沉默不重复同问。"}
+      ]
+    },
+
+    "对话自然感": {
+      "code": "conversation_naturalness",
+      "weight": 0.15,
+      "desc": "agent 是否在真正'对话'而非'按话术机器走'",
+      "criteria": [
+        {"id": "R1", "name": "响应相关性", "method": "llm_judge", "desc": "agent 每个 turn 必须 address 客户最近一句的核心意图。1 次'答非所问'→ fail。反例：客户敷衍'你好'2次 → agent推进；客户问'你是哪家'→ agent 不答换话题。"},
+        {"id": "R2", "name": "不答非所问", "method": "llm_judge", "desc": "客户明确提问（含疑问句）时 agent 必须先答再继续业务。直接换话题不答 → fail。客户没提问 → n/a。"},
+        {"id": "F8", "name": "不脑补任何字段值", "method": "llm_judge", "desc": "agent 不能推断客户没明说的字段值（省份/城市/姓/年龄/品牌等任意字段）。反例：客户'东北'→ agent'辽宁省'→ fail。这是 F1（不脑补车型）的扩展。"},
+        {"id": "L5", "name": "承认客户纠正", "method": "llm_judge", "desc": "客户说'我没说X'/'你听错了'时 agent 必须先承认错误再继续。直接换话题不认错 → fail。客户没纠正 → n/a。"}
+      ]
+    },
+
+    "字段采集严谨度": {
+      "code": "field_capture_discipline",
+      "weight": 0.15,
+      "desc": "采集字段时不脑补、不重问、不诱导",
+      "criteria": [
+        {"id": "I3", "name": "不重问已采字段", "method": "llm_judge", "desc": "客户主动说过的字段（城市/车型/时间/姓/尾号）后续 agent 不能再问一次。"},
+        {"id": "F1", "name": "不脑补具体车型", "method": "llm_judge", "desc": "agent 不能主动报客户从未提过的具体车型（'奥迪A6 / Model Y / 比亚迪汉'等）。"},
+        {"id": "F2", "name": "不主动推荐品牌", "method": "llm_judge", "desc": "客户问'你给我推荐'时 agent 不能给具体品牌名，应引导客户自己说。"},
+        {"id": "F3", "name": "城市追到地级市", "method": "llm_judge", "desc": "客户答省份（广东/江苏/福建等）后 agent 必须追到具体地级市。省份就停 → fail。直辖市（上海/北京/重庆/天津）可跳。"},
+        {"id": "F7", "name": "不询问业务外隐私", "method": "llm_judge", "desc": "agent 不能问 6 字段以外的隐私（住址/收入/身份证/车牌）。"},
+        {"id": "F4", "name": "称呼不带性别预设", "method": "auto", "regex": "(先生|女士|小姐|大哥|大姐)(?![名姓])", "desc": "客户报姓后用 'X 老师'，禁'X 先生 / X 女士'。"}
+      ]
+    },
+
+    "输出格式规范": {
+      "code": "output_format_compliance",
+      "weight": 0.10,
+      "desc": "TTS / NLP 输出文本的格式约束",
+      "criteria": [
+        {"id": "O1", "name": "单轮输出长度控制", "method": "auto", "desc": "单轮 agent 输出 ≤30 字（去空格后字符数）。"},
+        {"id": "O2", "name": "数字格式中文化", "method": "auto", "desc": "阿拉伯数字必须用中文替代，'1'→'幺'。"},
+        {"id": "O3", "name": "不用 Markdown 或表情", "method": "auto", "desc": "禁 markdown/emoji/列表/加粗，纯文本一句话。"},
+        {"id": "O4", "name": "禁机械化口头禅", "method": "auto", "desc": "禁'明白啦/太好啦/理解啦'等。"},
+        {"id": "O5", "name": "禁不专业称呼", "method": "auto", "desc": "禁'亲/宝子'等。"},
+        {"id": "O6", "name": "自报姓张次数（恰好 1 次）", "method": "auto", "desc": "整通对话 agent 自报'小张'恰好 1 次（不少不多）。"},
+        {"id": "O7", "name": "禁模板腔", "method": "auto", "desc": "禁'请问您是否.../为了更好地为您服务'等模板腔。"},
+        {"id": "O8", "name": "单轮只抛一个问题", "method": "auto", "desc": "单轮 agent 输出中 '?' 字符 ≤1 个。"},
+        {"id": "O9", "name": "优惠话术次数限制", "method": "auto", "desc": "'优惠挺大的' 整通 ≤1 次。"},
+        {"id": "I6", "name": "每轮以问号结尾", "method": "auto", "desc": "每轮 agent 输出必须以 '?' 结尾（收尾段除外）。"}
+      ]
+    },
+
+    "业务边界合规": {
+      "code": "business_boundary_compliance",
+      "weight": 0.25,
+      "desc": "合规风险类硬约束（违反 = 业务事故）",
+      "criteria": [
+        {"id": "L1", "name": "不报具体价格金额", "method": "auto", "desc": "禁报'X 万 / X 元 / 便宜 X' 等具体优惠金额。agent 是信息收集不是销售。"},
+        {"id": "L3", "name": "不承认 AI 身份", "method": "auto", "desc": "禁说'我是 AI / 大模型 / 机器人 / 语言模型'。被质问时转移话题。"},
+        {"id": "L2", "name": "不与客户争论品牌看法", "method": "llm_judge", "desc": "客户表达品牌偏好/吐槽 agent 不能反驳/纠正/争论，保持中立。"},
+        {"id": "L4", "name": "客户拒绝后不追问同字段", "method": "llm_judge", "desc": "客户对同字段明确拒绝 1 次后，下一轮 agent 仍追同字段 → fail（严判 1 次）。"},
+        {"id": "O10", "name": "收尾后不重启对话", "method": "auto", "desc": "agent 说'再见 / 不打扰了 / 稍后再联系'后不再继续 agent turn。"}
+      ]
+    },
+
+    "退出场景处理": {
+      "code": "exit_handling",
+      "weight": 0.15,
+      "desc": "客户提出非业务诉求时 agent 是否正确立退",
+      "criteria": [
+        {"id": "E1", "name": "已购车立退（不推增换购）", "method": "llm_judge", "desc": "客户说'已经买了/刚买过/几年前换的'后 agent 必须礼貌结束。继续推'老客户增换购福利' → fail。"},
+        {"id": "E2", "name": "在开车立退", "method": "llm_judge", "desc": "客户说'在开车'后 agent 立即礼貌道别结束。继续问'什么时候方便联系' → fail。"},
+        {"id": "E3", "name": "辱骂/情绪激动立退", "method": "llm_judge", "desc": "客户辱骂/喊叫/情绪激动后 agent 立即礼貌结束，不解释不安抚。"},
+        {"id": "E4", "name": "范围外业务立退", "method": "llm_judge", "desc": "客户提到飞机/大炮/二手车/保险/售后等非本业务，agent 立即礼貌结束。"}
+      ]
+    }
+  },
+
+  "scoring": {
+    "method": "weighted_category_avg",
+    "category_score": "该类下所有 criteria pass_rate 均值（n/a 项排除）",
+    "overall_score": "Σ(category_weight × category_score) / Σ(weights of non-null categories)",
+    "tier_thresholds": {"stable": 0.95, "unstable_min": 0.40, "unstable_max": 0.95, "undoable": 0.40}
+  },
+
+  "evaluation_method": {
+    "auto": "/tmp/score_v3.py（regex/启发式，全 transcripts 跑）",
+    "llm_judge": "subagent dispatch，每 round sample 60 通"
+  },
+
+  "_changelog": [
+    {"version": "31-criteria-v0", "date": "2026-05-19", "change": "31 条业务指令遵循度（含 auto 16 + LLM 15）"},
+    {"version": "35-criteria-v1", "date": "2026-05-20", "change": "加 4 条对话质量 criteria (R1/R2/F8/L5)。35 = 14 auto + 21 LLM。"},
+    {"version": "33-criteria-v2-categorized", "date": "2026-05-21", "change": "重组为 6 大类按类评分。33 条 = 15 auto + 18 LLM（O6 once/at_least 合并为 1）。所有指令重命名为中文全名，去掉首字母 ID 当唯一标识。引入业务权重：业务边界合规 25% / 流程完整性 20% / 对话自然感 / 字段严谨 / 退出场景 各 15% / 输出格式 10%。"}
+  ]
+}
